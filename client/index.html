@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pinka.io</title>
+    <style>
+    body {
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial;
+    }
+
+    h2 {
+      font-size: 32px;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    #overlay {
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      position:absolute;
+      background: rgba(0, 0, 0, 0.8);
+      transition: 0.1s;
+    }
+
+    #container {
+      width: 263px;
+      background: #fff;
+      border-radius: 15px;
+      padding: 5px 15px;
+      margin: 100px auto;
+    }
+
+    #nickInput {
+      border-radius: 5px;
+      padding: 10px 15px;
+      border: 1px solid #ddd;
+      outline: 0;
+      font-size: 14px;
+    }
+
+    #playButton {
+      background: white;
+      color: #black;
+      border-radius: 5px;
+      padding: 10px 15px;
+      border: 1px solid #ddd;
+      outline: 0;
+    }
+
+    #playButton:hover {
+      background: #eee;
+    }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="overlay">
+        <div id="container">
+          <h2>hello!</h2>
+          <p>type a nick below or leave it empty.</p>
+          <div id="inputs">
+            <input type="text" id="nickInput" placeholder="nick">
+            <button id="playButton">play</button>
+          </div>
+          <hr>
+          <center><p>spacebar for split<br>w for eject<br>e for recombine</p></center>
+        </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var cvs = document.getElementById("gameCanvas");
+        var width = innerWidth,
+            height = innerHeight;
+        cvs.height = height;
+        cvs.width = width;
+
+        var ctx = cvs.getContext("2d");
+
+        ctx.imageSmoothingQuality = "high";
+
+        var socket = io();
+
+
+        socket.emit("width and height", {
+            w: width,
+            h: height
+        });
+
+
+
+        var blobs = [];
+        function drawBlob(b) {
+
+            var r = b.size;
+
+            ctx.save();
+            ctx.translate(b.x, b.y);
+
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.closePath();
+
+            ctx.fillStyle = "hsl(" + b.hue + ", 100%, 60%)";
+            // ctx.strokeStyle = "hsl(" + this.hue + ", 100%, 50%)";
+            //ctx.strokeStyle = "#000";
+            //ctx.lineWidth = 10;
+
+            ctx.fill();
+           // ctx.stroke();
+            ctx.restore();
+
+            
+            if(b.nick) {
+                // drawSkin(b);
+            } else {
+                return;
+            }
+
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            var size = b.size;
+
+            ctx.fillStyle = "white";
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+
+            ctx.font = size * 0.48 + "px Arial";
+
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = size * 0.07;
+
+            ctx.strokeText(b.nick, 0, 0);
+            ctx.fillText(b.nick, 0, 0);
+
+
+            
+
+            // ctx.font = size * 0.40 + "px Arial";
+            // ctx.lineWidth = size * 0.09;
+            // ctx.strokeText(Math.floor(this.mass), 0, 0.79 * size);
+            // ctx.fillText(Math.floor(this.mass), 0, 0.79 * size);
+
+            ctx.restore();
+        };
+
+        function drawSkin(b) {
+            var r = b.size;
+            var skin = new Image();
+
+            skin.src = "http://agarioskins.com/img/skin/" + b.nick + ".png";
+
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.closePath();
+                
+            ctx.clip();
+            ctx.drawImage(skin, -r, -r, r * 2, r * 2);
+            ctx.restore();
+            
+        }
+
+        window.addEventListener("mousemove", function(e) {
+            socket.emit("input mouse", {
+                clientX: e.clientX,
+                clientY: e.clientY
+            });
+        });
+        window.addEventListener("keydown", function(e) {
+            socket.emit("input keydown", {
+                keyCode: e.keyCode
+            });
+        });
+        window.addEventListener("keyup", function(e) {
+            socket.emit("input keyup", {
+                keyCode: e.keyCode
+            });
+        });
+
+
+        socket.on("update blobs", function(data) {
+            blobs = data;
+        });
+
+
+        var tX = 0;
+        var tY = 0;
+        var z = 1;
+
+        socket.on("center and zoom", function(d) {
+            tX = -d.centerX;
+            tY = -d.centerY;
+            z = d.zoom;
+        });
+
+        socket.on("dead", function() {
+            document.getElementById("overlay").style.display = "block";
+        });
+
+        socket.on("joined", function() {
+            document.getElementById("overlay").style.display = "none";
+        });
+
+
+        var play = document.getElementById("playButton");
+        
+        var nickInput = document.getElementById("nickInput");
+        play.onclick = function() {
+            var nick = nickInput.value;
+
+            if(nick != "") {
+                document.getElementById("overlay").style.display = "none";
+
+                socket.emit("join game", {
+                    nick: nick,
+                    skinURL: ""
+                });
+            }
+
+        };
+
+        
+
+
+        
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.save();
+        
+
+            ctx.translate(tX, tY);
+            ctx.scale(z, z);
+
+
+            blobs = blobs.sort(function(a, b) {
+                return a.size - b.size;
+            });
+
+            for(var i in blobs) {
+                var b = blobs[i];
+                drawBlob(b);
+            }
+
+            ctx.restore();
+
+            requestAnimationFrame(draw);
+        };
+
+        draw();
+    </script>
+    
+</body>
+</html>
