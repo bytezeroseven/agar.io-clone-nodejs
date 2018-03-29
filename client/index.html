@@ -128,10 +128,15 @@
             ctx.textBaseline = "middle";
             ctx.textAlign = "center";
 
-            ctx.font = size * 0.48 + "px Arial";
+
+            var fontsize = size * 0.34;
+            do {
+                fontsize--;
+                ctx.font = fontsize + "px Arial";
+            } while(ctx.measureText(b.nick).width > size * 1.86)
 
             ctx.strokeStyle = 'black';
-            ctx.lineWidth = size * 0.07;
+            ctx.lineWidth = size * 0.04;
 
             ctx.strokeText(b.nick, 0, 0);
             ctx.fillText(b.nick, 0, 0);
